@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
-import configparser as parser
+import configparser as Parser
 driver = webdriver.Chrome()
 
 ### 설정 세팅 ###
