@@ -4,10 +4,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
+import configparser as parser
 driver = webdriver.Chrome()
 
 ### 설정 세팅 ###
 
+#프로퍼티 파일 읽기
+properties = parser.ConfigParser()
+properties.read('./config.ini')
+user_config = properties['USER']
+
+shopping_url = 'https://www.ssg.com/item/itemView.ssg?itemId=1000367120406&siteNo=6001&salestrNo=2037&tlidSrchWd=%EC%BD%A4%EB%B6%80%EC%B0%A8&srchPgNo=1&src_area=ssglist'
+loginUrl = 'https://member.ssg.com/member/login.ssg'
+id = user_config['id']
+pw = user_config['pw']
 
 # 장바구니 담기 => 로그인 여부 확인 => 로그인
 
@@ -69,7 +79,8 @@ def main():
             
             wait.until(EC.element_to_be_clickable((By.ID, "mbrCartCntInfo"))).click()
             print("장바구니 이동 성공")
-            
+            while True:
+                time.sleep(1)
     except Exception as e:
         print(f"에러 발생: {e}")
     finally:
