@@ -7,21 +7,36 @@ import time
 import configparser as Parser
 driver = webdriver.Chrome()
 
-### 설정 세팅 ###
+from flask import Flask, request, jsonify
+app = Flask(__name__)
+
+############################################################  주요 로직 ############################################################
+
+# 1.SSG 로그인
+# 2.요청 URL의 상품 장바구니 담기
+
+####################################################################################################################################
+
+
+############################################################  설정 세팅 ############################################################
 
 #프로퍼티 파일 읽기
-properties = parser.ConfigParser()
+properties = Parser.ConfigParser()
 properties.read('./config.ini')
+
+#프로퍼티 세션 읽기
 user_config = properties['USER']
+host_config = properties['HOST']
+login_config = properties['LOGININFO']
 
-shopping_url = 'https://www.ssg.com/item/itemView.ssg?itemId=1000367120406&siteNo=6001&salestrNo=2037&tlidSrchWd=%EC%BD%A4%EB%B6%80%EC%B0%A8&srchPgNo=1&src_area=ssglist'
-loginUrl = 'https://member.ssg.com/member/login.ssg'
-
+#전역변수 값 세팅
+login_url = login_config['login_url']
 id = user_config['id']
 pw = user_config['pw']
+####################################################################################################################################
 
-# 장바구니 담기 => 로그인 여부 확인 => 로그인
 
+#크롬 세팅
 def setup_chrome():
     chrome_options = Options()
 
@@ -42,11 +57,11 @@ def setup_chrome():
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
-
+#로그인 체크
 def check_login(driver,wait):
     try:
         
-        driver.get(loginUrl)
+        driver.get(login_url)
         wait.until(EC.presence_of_element_located((By.ID, "mem_id"))).send_keys(id)
         wait.until(EC.presence_of_element_located((By.ID, "mem_pw"))).send_keys(pw)
         wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".cmem_btn.cmem_btn_ornge"))).click()
@@ -64,7 +79,8 @@ def check_login(driver,wait):
         print("로그인 버튼이 존재하지 않거나, 로그인이 되어 있음: ",e)
         return False
 
-def add_to_cart(driver,wait):
+#장바구니 담기
+def add_to_cart(driver,wait,shopping_url):
     try:
             driver.get(shopping_url)
             driver.implicitly_wait(5)
@@ -81,19 +97,37 @@ def add_to_cart(driver,wait):
         return False
 
 
-def main():
+#메인 함수
+def do_cart(shopping_url):
     driver = setup_chrome()
     wait = WebDriverWait(driver,10)
+    result = {
+        'result' : False
+        ,'message' : ''
+        ,'error' : ''
+    }
+
     try:
         if check_login(driver,wait):
-            if add_to_cart(driver,wait):
+            if add_to_cart(driver,wait,shopping_url):
                 print("성공")
-            while True:
-                time.sleep(1)
+                result['result'] = True
+                result['message'] = '장바구니 담기 성공'
     except Exception as e:
-        print(f"에러 발생: {e}")
+        result['message'] = '장바구니 담기 실패'
+        result['error'] = e
     finally:
         pass
+    return result
+
+#API 호출
+@app.route('/api/cart',methods=['POST'])
+def add_cart():
+    data = request.get_json()
+    print(data)
+    shopping_url = data['shopping_url']
+    result = do_cart(shopping_url)
+    return jsonify(result)
 
 if __name__ =="__main__":
-    main()
+    app.run(host=host_config['host'],port=host_config['port'])
