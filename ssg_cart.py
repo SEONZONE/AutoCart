@@ -14,7 +14,9 @@ app = Flask(__name__)
 ############################################################  주요 로직 ############################################################
 
 # 1.SSG 로그인
-# 2.요청 URL의 상품 장바구니 담기
+# 2.요청 URL의 상품 장바구니 수량입력
+# 3.상품 장바구니 담기
+# 4.장바구니 내역 확인
 
 ####################################################################################################################################
 
@@ -136,7 +138,34 @@ def add_to_cart(driver,wait,shopping_url,amount=1):
         return result
     except Exception as e:
         result['message'] = f'장바구니 담기 실패: {e}'
-        print('장바구니 담기 실패',e)
+        print('[add_to_cart] 장바구니 담기 실패',e)
+        return result
+    
+#장바구니 목록 불러오기
+def get_cart_items(driver):
+    result = {
+        'result' : False
+        ,'message' : ''
+        ,'itemsList' :[]
+        ,'totalPrice': ''
+    }
+    try:
+        items = driver.find_elements(By.XPATH, "//tr[contains(@class, 'pay_item_area')]")
+        for item in items:
+            name = item.find_element(By.CSS_SELECTOR, ".codr_unit_name .tx_ko").text
+            amount = item.find_element(By.CLASS_NAME, "ordQty").get_attribute("value")
+            item_info = {
+                'name' : name
+                ,'amount' : amount
+            }
+            result['itemsList'].append(item_info)
+        result['totalPrice'] = driver.find_element(By.CSS_SELECTOR, ".codr_dl_totalprice .ssg_price").text
+        result['result'] = True
+        result['message'] = '장바구니 목록 성공'
+        return result
+    except Exception as e:
+        result['message'] = f'장바구니 목록 실패: {e}'
+        print('[get_cart_items] 장바구니 목록 실패',e)
         return result
 
     
@@ -153,14 +182,12 @@ def do_cart(shopping_url,amount):
         if check_login(driver,wait):
             add_to_cart_json = add_to_cart(driver,wait,shopping_url,amount)
             if add_to_cart_json['result']:
-                result['result'] = True
-                result['message'] = '장바구니 담기 성공'
+                result = get_cart_items(driver)
             else:
                 result['result'] = False
                 result['message'] = add_to_cart_json['message']
-
     except Exception as e:
-        result['message'] = '장바구니 담기 실패'
+        result['message'] = '[do_cart] 장바구니 담기 실패'
         result['error'] = e
     finally:
         pass
