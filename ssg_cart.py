@@ -3,6 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys  
 import time
 import configparser as Parser
 driver = webdriver.Chrome()
@@ -53,52 +54,93 @@ def setup_chrome():
     # 사용자 에이전트 설정
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
 
+    #해상도 설정
+    chrome_options.add_argument('--window-size=1920,1080')  # Full HD 해상도
+
     # 드라이버 생성
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 #로그인 체크
 def check_login(driver,wait):
+    result = {
+        'result' : False
+        ,'message' : ''
+    }
     try:
         
         driver.get(login_url)
-        wait.until(EC.presence_of_element_located((By.ID, "mem_id"))).send_keys(id)
-        wait.until(EC.presence_of_element_located((By.ID, "mem_pw"))).send_keys(pw)
+        driver.find_element(By.ID,"mem_id").send_keys(id)
+        driver.find_element(By.ID,"mem_pw").send_keys(pw)
         wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".cmem_btn.cmem_btn_ornge"))).click()
 
-        time.sleep(3)  # 기본 대기
+        time.sleep(1)
         try:
             wait.until(EC.presence_of_element_located((By.ID, "logoutBtn")))
             print("로그인 성공 확인")
-        except:
+        except Exception as e:
             print("로그인 확인 실패")
-            return False
+            result['message'] = f'로그인 실패: {e}'
+            return result
         
-        return True
+        result['result'] = True   
+        result['message'] = '로그인 성공'
+        return result
     except Exception as e:
-        print("로그인 버튼이 존재하지 않거나, 로그인이 되어 있음: ",e)
-        return False
+        result['message'] = f'로그인 실패: {e}'
+        print('로그인 실패',e)
+        return result
 
 #장바구니 담기
-def add_to_cart(driver,wait,shopping_url):
+def add_to_cart(driver,wait,shopping_url,amount=1):
+    result = {
+        'result' : False
+        ,'message' : ''
+    }
     try:
-            driver.get(shopping_url)
-            driver.implicitly_wait(5)
-            
-            wait.until(EC.element_to_be_clickable((By.ID, "actionCart"))).click()
-            print("장바구니 선택 성공")
-            
-            wait.until(EC.element_to_be_clickable((By.ID, "mbrCartCntInfo"))).click()
-            print("장바구니 이동 성공")
+        driver.get(shopping_url)
 
-            return True
+        #수량 선택
+        try:
+            amount_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input#cdtl_item_amount1[title="수량입력"]')))
+            amount_input.send_keys(Keys.CONTROL + "a", Keys.DELETE)
+            amount_input.send_keys(str(amount))
+            time.sleep(1)
+            print("수량 입력 완료")
+        except Exception as e:
+            print(f"수량 입력 중 에러: {e}")
+            result['message'] = f'수량 입력 실패: {e}'
+            return result
+        time.sleep(1)
+
+        #장바구니 선택
+        try:
+            driver.find_element(By.XPATH,"//*[@id='actionCart']").click()
+            print("장바구니 선택 완료")
+        except Exception as e:
+            print(f"장바구니 선택 중 에러: {e}")
+            result['message'] = f'장바구니 선택 실패: {e}'
+            return result
+
+        #장바구니 이동
+        try:
+            driver.execute_script("ssgGnb.fn_btnClickCart();")
+            print("장바구니 이동 완료")
+        except Exception as e:
+            print(f"장바구니 이동 중 에러: {e}")
+            result['message'] = f'장바구니 이동 실패: {e}'
+            return result
+
+        result['result'] = True
+        result['message'] = '장바구니 담기 성공'
+        return result
     except Exception as e:
-        print("장바구니에 상품 담기 실패: ",e)
-        return False
+        result['message'] = f'장바구니 담기 실패: {e}'
+        print('장바구니 담기 실패',e)
+        return result
 
-
-#메인 함수
-def do_cart(shopping_url):
+    
+def do_cart(shopping_url,amount):
     driver = setup_chrome()
     wait = WebDriverWait(driver,10)
     result = {
@@ -109,10 +151,14 @@ def do_cart(shopping_url):
 
     try:
         if check_login(driver,wait):
-            if add_to_cart(driver,wait,shopping_url):
-                print("성공")
+            add_to_cart_json = add_to_cart(driver,wait,shopping_url,amount)
+            if add_to_cart_json['result']:
                 result['result'] = True
                 result['message'] = '장바구니 담기 성공'
+            else:
+                result['result'] = False
+                result['message'] = add_to_cart_json['message']
+
     except Exception as e:
         result['message'] = '장바구니 담기 실패'
         result['error'] = e
@@ -124,9 +170,21 @@ def do_cart(shopping_url):
 @app.route('/api/cart',methods=['POST'])
 def add_cart():
     data = request.get_json()
-    print(data)
+
+    if not data or 'shopping_url' not in data:
+        return jsonify({
+            'result' : False
+            ,'error' : '응답값 오류'
+            ,'message' : 'shopping_url 인자값이 존재하지 않거나, 올바르지 않습니다.'
+            
+        })
+
+    # 쇼핑 주소
     shopping_url = data['shopping_url']
-    result = do_cart(shopping_url)
+    # 품목 수량
+    amount = data.get('amount',1) <= 0 if 1 else data.get('amount',1)
+
+    result = do_cart(shopping_url,amount)
     return jsonify(result)
 
 if __name__ =="__main__":
