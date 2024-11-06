@@ -6,7 +6,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys  
 import time
 import configparser as Parser
-driver = webdriver.Chrome()
 
 from flask import Flask, request, jsonify
 app = Flask(__name__)
@@ -44,9 +43,10 @@ def setup_chrome():
     chrome_options = Options()
 
     # 필수 옵션
-    # chrome_options.add_argument('--headless')  # UI 없이 백그라운드에서 실행
+    chrome_options.add_argument('--headless')  # UI 없이 백그라운드에서 실행
     chrome_options.add_argument('--no-sandbox') # 샌드박스 비활성화 (리눅스에서 필요)
     chrome_options.add_argument('--disable-dev-shm-usage') # 공유 메모리 사용 비활성화
+    chrome_options.add_argument('--disable-gpu')
 
     # 성능 최적화
     chrome_options.add_argument('--disable-extensions') # 확장 프로그램 비활성화
@@ -59,9 +59,16 @@ def setup_chrome():
     #해상도 설정
     chrome_options.add_argument('--window-size=1920,1080')  # Full HD 해상도
 
+    # 메모리 제한 설정
+    chrome_options.add_argument('--js-flags=--max-old-space-size=512')  # JavaScript 힙 메모리 제한
+    chrome_options.add_argument('--memory-pressure-off')  # 메모리 압력 모니터링 비활성화
+
+    # 캐시 설정
+    chrome_options.add_argument('--disk-cache-size=1')
+    chrome_options.add_argument('--media-cache-size=1')
+
     # 드라이버 생성
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
+    return webdriver.Chrome(options=chrome_options)
 
 #로그인 체크
 def check_login(driver,wait):
@@ -170,7 +177,7 @@ def get_cart_items(driver):
 
     
 def do_cart(shopping_url,amount):
-    driver = setup_chrome()
+    driver = None
     wait = WebDriverWait(driver,10)
     result = {
         'result' : False
@@ -179,6 +186,9 @@ def do_cart(shopping_url,amount):
     }
 
     try:
+        driver = setup_chrome()
+        wait = WebDriverWait(driver, 10)  # driver 생성 후 wait 초기화
+        
         if check_login(driver,wait):
             add_to_cart_json = add_to_cart(driver,wait,shopping_url,amount)
             if add_to_cart_json['result']:
@@ -190,7 +200,9 @@ def do_cart(shopping_url,amount):
         result['message'] = '[do_cart] 장바구니 담기 실패'
         result['error'] = e
     finally:
-        pass
+        if driver:
+            driver.quit()  # 드라이버 종료
+            del driver    # 메모리에서 명시적 제거
     return result
 
 #API 호출
