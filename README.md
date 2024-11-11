@@ -12,7 +12,7 @@
 
 - 개발기간
 
-   - 2024.11.01 ~ 진행중
+   - 2024.11.01 ~ 2024.11.11
 
 - 개발스택
 
@@ -22,7 +22,8 @@
 
    - 사용 라이브러리: Selenium
 
-   - 배포: AWS Lambda
+   - 배포: AWS Lambda, AWS ECR
+   - API : AWS API GATEWAY
 
 - 특징
 
